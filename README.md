@@ -49,7 +49,7 @@ npm run dev
 The MCP endpoint is available at:
 
 ```text
-http://localhost:3000/mcp
+http://localhost:8000/mcp
 ```
 
 ## MCP Client Setup
@@ -88,7 +88,7 @@ In stdio mode all logs go to stderr, because stdout is reserved for the JSON-RPC
 If your MCP client supports remote Streamable HTTP servers, use this endpoint directly:
 
 ```text
-http://localhost:3000/mcp
+http://localhost:8000/mcp
 ```
 
 For clients that launch MCP servers through a command, use `mcp-remote`:
@@ -98,7 +98,7 @@ For clients that launch MCP servers through a command, use `mcp-remote`:
 	"mcpServers": {
 		"fitatu": {
 			"command": "npx",
-			"args": ["mcp-remote", "http://localhost:3000/mcp"]
+			"args": ["mcp-remote", "http://localhost:8000/mcp"]
 		}
 	}
 }
@@ -115,7 +115,7 @@ npx @modelcontextprotocol/inspector
 Use this URL in the Inspector:
 
 ```text
-http://localhost:3000/mcp
+http://localhost:8000/mcp
 ```
 
 ## Available Tools
@@ -148,7 +148,7 @@ Runtime configuration is read from environment variables and validated at startu
 | `FITATU_APP_VERSION`  | No       | `4.14.4`              | No        | Fitatu mobile application version.              |
 | `FITATU_API_APK_UUID` | No       | `BE4B.251210.005`     | No        | Fitatu mobile build identifier sent to the API. |
 | `MCP_TRANSPORT`       | No       | `http`                | No        | `http` (Streamable HTTP) or `stdio`.            |
-| `PORT`                | No       | `3000`                | No        | HTTP server port. Unused with `stdio`.          |
+| `PORT`                | No       | `8000`                | No        | HTTP server port. Unused with `stdio`.          |
 | `NODE_ENV`            | No       | `development`         | No        | `development`, `production`, or `test`.         |
 | `SERVER_NAME`         | No       | `fitatu-mcp`          | No        | MCP server name.                                |
 | `SERVER_VERSION`      | No       | `2.0.0`               | No        | MCP server version.                             |
@@ -231,7 +231,7 @@ with other people.
 Run the container:
 
 ```bash
-docker run --name fitatu-mcp -p 3000:3000 fitatu-mcp
+docker run --name fitatu-mcp -p 8000:8000 fitatu-mcp
 ```
 
 If a container with that name already exists, recreate it:
@@ -239,15 +239,15 @@ If a container with that name already exists, recreate it:
 ```bash
 docker stop fitatu-mcp
 docker rm fitatu-mcp
-docker run --name fitatu-mcp -p 3000:3000 fitatu-mcp
+docker run --name fitatu-mcp -p 8000:8000 fitatu-mcp
 ```
 
 ## Exposing a Local Server with Cloudflare Tunnel
 
-When the server is running locally on port `3000`, expose it through a temporary Cloudflare Tunnel:
+When the server is running locally on port `8000`, expose it through a temporary Cloudflare Tunnel:
 
 ```bash
-cloudflared tunnel --url http://localhost:3000
+cloudflared tunnel --url http://localhost:8000
 ```
 
 Cloudflare will print a public tunnel URL. Use that URL with the `/mcp` path as the MCP endpoint.
