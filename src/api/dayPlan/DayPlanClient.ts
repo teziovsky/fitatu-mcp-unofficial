@@ -94,6 +94,11 @@ export class DayPlanClient extends FitatuApiClientBase {
 				normalizedOptions.measureId,
 				normalizedOptions.eaten,
 				userId,
+				normalizedOptions.name,
+				normalizedOptions.energyKcal,
+				normalizedOptions.proteinG,
+				normalizedOptions.fatG,
+				normalizedOptions.carbohydrateG,
 			),
 		);
 	}
@@ -121,7 +126,7 @@ export class DayPlanClient extends FitatuApiClientBase {
 			FITATU_CLIENT_OPERATIONS.dayPlanRemoveItems,
 		);
 		return this.mealItemMutationCoordinator.removeMealItems(
-			new RemoveMealItemsOptions(normalizedOptions.date, normalizedOptions.itemIds, userId),
+			new RemoveMealItemsOptions(normalizedOptions.date, normalizedOptions.items, userId),
 		);
 	}
 

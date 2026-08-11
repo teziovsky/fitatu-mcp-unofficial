@@ -4,7 +4,7 @@ import { GetDayPlanOptions } from "../../api/dayPlan/GetDayPlanOptions.ts";
 import { DateUtils } from "../../shared/DateUtils.ts";
 import { createTextResult } from "../shared/ToolResult.ts";
 import type { DayPlanQueryProvider } from "../../services/dayPlan/DayPlanQueryService.ts";
-import { mealKeySchema } from "../mealItems/MealItemToolSupport.ts";
+import { MEAL_KEY_HINT, mealKeySchema } from "../mealItems/MealItemToolSupport.ts";
 import { ToolErrorResult } from "../shared/ToolErrorResult.ts";
 import type { DayPlanItem } from "../../api/dayPlan/DayPlanItem.ts";
 import { isoCalendarDateSchema, rawRecipeIdSchema } from "../shared/ToolSchemas.ts";
@@ -49,7 +49,7 @@ const dayPlanOutputSchema = {
 		.array(
 			z.object({
 				mealKey: mealKeySchema.describe(
-					"Canonical Fitatu meal key accepted by add, update, and move meal item tools.",
+					`Fitatu meal key accepted by add, update, and move meal item tools. ${MEAL_KEY_HINT}`,
 				),
 				mealTime: z.string().optional().describe("Meal time configured in Fitatu, when available."),
 				items: z
@@ -76,7 +76,7 @@ export class GetDayPlanItemsTool {
 			{
 				title: "Get Fitatu Day Plan Items",
 				description:
-					"Fetches Fitatu meals and concrete day-plan entries. Copy itemId UUID values to update_meal_item, move_meal_item, or remove_meal_items; productId and raw recipeId identify food definitions, not removable entries. Defaults to today's local date.",
+					"Fetches Fitatu meals and concrete day-plan entries. Copy the exact mealKey with itemId to update_meal_item, move_meal_item, or remove_meal_items; productId and raw recipeId identify food definitions, not removable entries. Defaults to today's local date.",
 				inputSchema: z
 					.object({
 						date: isoCalendarDateSchema()

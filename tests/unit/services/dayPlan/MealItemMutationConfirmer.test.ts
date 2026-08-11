@@ -6,6 +6,7 @@ import { MealItemMutationResult } from "../../../../src/api/dayPlan/MealItemMuta
 import { MealItemOperationSummary } from "../../../../src/api/dayPlan/MealItemOperationSummary.ts";
 import { MoveMealItemOptions } from "../../../../src/api/dayPlan/MoveMealItemOptions.ts";
 import { RemoveMealItemsOptions } from "../../../../src/api/dayPlan/RemoveMealItemsOptions.ts";
+import { MealItemRemovalTarget } from "../../../../src/api/dayPlan/MealItemRemovalTarget.ts";
 import { UpdateMealItemOptions } from "../../../../src/api/dayPlan/UpdateMealItemOptions.ts";
 import { FitatuClientError } from "../../../../src/api/fitatuApiClientBase/FitatuClientError.ts";
 import { FITATU_CLIENT_OPERATIONS } from "../../../../src/api/fitatuApiClientBase/FitatuClientOperations.ts";
@@ -95,11 +96,12 @@ describe("MealItemMutationConfirmer", () => {
 				breakfast: [
 					{
 						planDayDietItemId: "item-1",
-						foodType: "PRODUCT",
-						productId: 101,
-						measureId: 2,
-						measureQuantity: 1,
-						eaten: false,
+						foodType: "CUSTOM_ITEM",
+						name: "Own snack",
+						energy: 300,
+						protein: 10,
+						fat: 8,
+						carbohydrate: 40,
 					},
 				],
 			}),
@@ -107,11 +109,12 @@ describe("MealItemMutationConfirmer", () => {
 				breakfast: [
 					{
 						planDayDietItemId: "item-1",
-						foodType: "PRODUCT",
-						productId: 101,
-						measureId: 3,
-						measureQuantity: 1.5,
-						eaten: true,
+						foodType: "CUSTOM_ITEM",
+						name: "Corrected snack",
+						energy: 321,
+						protein: 12.345,
+						fat: 9,
+						carbohydrate: 42,
 					},
 				],
 			}),
@@ -122,7 +125,22 @@ describe("MealItemMutationConfirmer", () => {
 			new BoundedPoller({ intervalMs: 1, timeoutMs: 50 }),
 		);
 
-		await confirmer.confirmUpdated(new UpdateMealItemOptions("2026-07-30", "breakfast", "item-1", 1.5, "3", true));
+		await confirmer.confirmUpdated(
+			new UpdateMealItemOptions(
+				"2026-07-30",
+				"breakfast",
+				"item-1",
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				" Corrected snack ",
+				321.004,
+				12.35,
+				9,
+				42,
+			),
+		);
 
 		expect(reads).toBe(2);
 	});
@@ -201,7 +219,12 @@ describe("MealItemMutationConfirmer", () => {
 			new BoundedPoller({ intervalMs: 1, timeoutMs: 50 }),
 		);
 
-		await confirmer.confirmRemoved(new RemoveMealItemsOptions("2026-07-30", ["item-1", "item-2"]));
+		await confirmer.confirmRemoved(
+			new RemoveMealItemsOptions("2026-07-30", [
+				new MealItemRemovalTarget("breakfast", "item-1"),
+				new MealItemRemovalTarget("lunch", "item-2"),
+			]),
+		);
 
 		expect(reads).toBe(2);
 	});
