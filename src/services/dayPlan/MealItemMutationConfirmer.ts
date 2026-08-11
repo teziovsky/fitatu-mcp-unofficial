@@ -69,13 +69,21 @@ export class MealItemMutationConfirmer {
 					MutationConfirmationValues.sameNumber(actual.measureQuantity, options.measureQuantity)) &&
 				(options.measureId === undefined ||
 					MutationConfirmationValues.sameIdentifier(actual.measureId, options.measureId)) &&
-				(options.eaten === undefined || actual.eaten === options.eaten)
+				(options.eaten === undefined || actual.eaten === options.eaten) &&
+				(options.name === undefined || actual.name === options.name.trim()) &&
+				(options.energyKcal === undefined ||
+					MutationConfirmationValues.sameNumber(actual.energy, options.energyKcal)) &&
+				(options.proteinG === undefined ||
+					MutationConfirmationValues.sameNumber(actual.protein, options.proteinG)) &&
+				(options.fatG === undefined || MutationConfirmationValues.sameNumber(actual.fat, options.fatG)) &&
+				(options.carbohydrateG === undefined ||
+					MutationConfirmationValues.sameNumber(actual.carbohydrate, options.carbohydrateG))
 			);
 		});
 	}
 
 	public async confirmRemoved(options: RemoveMealItemsOptions): Promise<void> {
-		const selectedIds = new Set(options.itemIds);
+		const selectedIds = new Set(options.items.map(({ itemId }) => itemId));
 		await this.confirmation.confirm(REMOVE_CONFIRMATION, async () => {
 			const dayPlan = await this.dayPlanProvider.getDayPlan({
 				date: options.date,
