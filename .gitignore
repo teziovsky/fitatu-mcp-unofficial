@@ -153,4 +153,5 @@ vite.config.ts.timestamp-*
 /tmp/*
 /PYTHON_REFERENCE_ENDPOINTS.md
 /.agents/*
+!.agents/mcp.json
 /skills-lock.json
