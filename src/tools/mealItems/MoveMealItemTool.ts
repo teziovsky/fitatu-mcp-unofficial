@@ -5,12 +5,13 @@ import { createTextResult } from "../shared/ToolResult.ts";
 import type { MealItemMutationProvider } from "../../services/dayPlan/MealItemMutationService.ts";
 import {
 	createSafeMealItemErrorResult,
+	MEAL_ITEM_MUTATION_SERIALIZATION_HINT,
 	MEAL_KEY_HINT,
 	mealKeySchema,
-	mealItemMutationOutputSchema,
-	toMealItemMutationForMcp,
+	moveMealItemOutputSchema,
+	toMoveMealItemForMcp,
 } from "./MealItemToolSupport.ts";
-import { isoCalendarDateSchema } from "../shared/ToolSchemas.ts";
+import { isoCalendarDateSchema, nonEmptyStringSchema } from "../shared/ToolSchemas.ts";
 
 export class MoveMealItemTool {
 	public static readonly toolName = "move_meal_item";
@@ -26,8 +27,7 @@ export class MoveMealItemTool {
 			MoveMealItemTool.toolName,
 			{
 				title: "Move Fitatu Meal Item",
-				description:
-					"Moves and confirms one existing Fitatu meal item selected by its exact source date, mealKey, and itemId. Provide a destination date, mealKey, or both that differs from the source. Fitatu creates a new item id during a valid move. A successful accepted result means the old item is absent and the new item with preserved observable values is present at the destination.",
+				description: `Moves and confirms one existing Fitatu meal item selected by its exact source date, mealKey, and itemId. Provide a destination date, mealKey, or both that differs from the source. Fitatu creates a new item id during a valid move. ${MEAL_ITEM_MUTATION_SERIALIZATION_HINT} For move_meal_item, this rule applies to both fromDate and toDate. Returns { status: 'confirmed', fromDate, fromMealKey, previousItemId, toDate, toMealKey, itemId }; use the returned itemId for later mutations.`,
 				inputSchema: z
 					.object({
 						fromDate: isoCalendarDateSchema("fromDate").describe(
@@ -36,10 +36,9 @@ export class MoveMealItemTool {
 						fromMealKey: mealKeySchema.describe(
 							`Current meal key containing the item. Use mealKey values returned by get_day_plan_items. ${MEAL_KEY_HINT}`,
 						),
-						itemId: z
-							.string()
-							.min(1)
-							.describe("Meal item id to move. Use itemId returned by get_day_plan_items."),
+						itemId: nonEmptyStringSchema("itemId").describe(
+							"Meal item id to move. Use itemId returned by get_day_plan_items.",
+						),
 						toDate: isoCalendarDateSchema("toDate")
 							.optional()
 							.describe(
@@ -59,8 +58,11 @@ export class MoveMealItemTool {
 						({ fromDate, fromMealKey, toDate, toMealKey }) =>
 							(toDate ?? fromDate) !== fromDate || (toMealKey ?? fromMealKey) !== fromMealKey,
 						{ message: "Move destination must differ from its source" },
+					)
+					.describe(
+						"Meal item move with at least one destination field and a destination different from the source.",
 					),
-				outputSchema: mealItemMutationOutputSchema,
+				outputSchema: moveMealItemOutputSchema,
 				annotations: {
 					title: "Move Fitatu Meal Item",
 					readOnlyHint: false,
@@ -74,7 +76,7 @@ export class MoveMealItemTool {
 					const result = await this.mealItemMutationService.moveMealItem(
 						new MoveMealItemOptions(fromDate, fromMealKey, itemId, toDate, toMealKey),
 					);
-					return createTextResult(toMealItemMutationForMcp(result));
+					return createTextResult(toMoveMealItemForMcp(result));
 				} catch (error) {
 					return createSafeMealItemErrorResult(
 						MoveMealItemTool.toolName,

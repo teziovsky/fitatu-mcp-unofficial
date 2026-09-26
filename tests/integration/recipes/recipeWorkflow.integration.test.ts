@@ -1,14 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { DayPlanClient } from "../../../src/api/dayPlan/DayPlanClient.ts";
 import type { DayPlanItem } from "../../../src/api/dayPlan/DayPlanItem.ts";
-import { FoodSearchClient } from "../../../src/api/foodSearch/FoodSearchClient.ts";
-import { RecipeClient } from "../../../src/api/recipes/RecipeClient.ts";
 import { FitatuClientError } from "../../../src/api/fitatuApiClientBase/FitatuClientError.ts";
 import type { RecipeDetails } from "../../../src/api/recipes/RecipeDetails.ts";
 import type { RecipeSearchResult } from "../../../src/api/recipes/RecipeSearchResult.ts";
 import { DetailedRecipeSearchItem } from "../../../src/services/recipes/DetailedRecipeSearchItem.ts";
 import { MealItemMutationConfirmer } from "../../../src/services/dayPlan/MealItemMutationConfirmer.ts";
 import { MealItemMutationService } from "../../../src/services/dayPlan/MealItemMutationService.ts";
+import { FoodSearchService } from "../../../src/services/foodSearch/FoodSearchService.ts";
 import { RecipeMutationConfirmer } from "../../../src/services/recipes/RecipeMutationConfirmer.ts";
 import { RecipeService } from "../../../src/services/recipes/RecipeService.ts";
 import {
@@ -17,21 +15,24 @@ import {
 	CleanupTrackingRecipeMutationConfirmer,
 } from "../helpers/cleanupTracker.ts";
 import { findMealItem } from "../helpers/dayPlanAssertions.ts";
+import { IntegrationTestContext } from "../helpers/IntegrationTestContext.ts";
 import { selectProductsByMeasure } from "../helpers/productSelection.ts";
 import { getIntegrationTestDate } from "../helpers/testDates.ts";
 
-const recipeClient = new RecipeClient();
-const foodSearchClient = new FoodSearchClient();
-const dayPlanClient = new DayPlanClient();
+const context = IntegrationTestContext.fromEnvironment();
+const recipeClient = context.recipeClient;
+const foodSearchClient = context.foodSearchClient;
+const foodSearchService = new FoodSearchService(foodSearchClient);
+const dayPlanClient = context.dayPlanClient;
 const cleanup = new CleanupTracker(dayPlanClient, recipeClient);
 const recipeService = new RecipeService(
 	recipeClient,
-	foodSearchClient,
+	foodSearchService,
 	new CleanupTrackingRecipeMutationConfirmer(new RecipeMutationConfirmer(recipeClient), cleanup),
 );
 const mealItemMutationService = new MealItemMutationService(
 	dayPlanClient,
-	foodSearchClient,
+	foodSearchService,
 	recipeClient,
 	new CleanupTrackingMealItemMutationConfirmer(new MealItemMutationConfirmer(dayPlanClient), cleanup),
 );
@@ -46,7 +47,7 @@ describe.sequential("Fitatu recipe integration workflow", () => {
 		const updatedName = `${uniqueName}_updated`;
 		const date = getIntegrationTestDate();
 		const products = await selectProductsByMeasure({
-			foodSearchClient,
+			foodSearchService: foodSearchService,
 			date,
 		});
 
@@ -169,12 +170,11 @@ describe.sequential("Fitatu recipe integration workflow", () => {
 				},
 			],
 		});
-		const provisionalMealItemId = requireItemId(addResult.provisionalItemIds[0]);
+		const provisionalMealItemId = requireItemId(addResult.addedItems[0]?.itemId);
 		cleanup.track(date, "supper", provisionalMealItemId);
 		expect(addResult).toMatchObject({
-			status: "accepted",
 			operation: "add",
-			acceptedItems: [
+			addedItems: [
 				{
 					itemId: provisionalMealItemId,
 					foodType: "RECIPE",

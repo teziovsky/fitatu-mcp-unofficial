@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { DayPlanClient } from "../../../src/api/dayPlan/DayPlanClient.ts";
 import type { DayPlanItem } from "../../../src/api/dayPlan/DayPlanItem.ts";
-import { FoodSearchClient } from "../../../src/api/foodSearch/FoodSearchClient.ts";
-import { RecipeClient } from "../../../src/api/recipes/RecipeClient.ts";
 import { MealItemMutationConfirmer } from "../../../src/services/dayPlan/MealItemMutationConfirmer.ts";
 import { MealItemMutationService } from "../../../src/services/dayPlan/MealItemMutationService.ts";
+import { FoodSearchService } from "../../../src/services/foodSearch/FoodSearchService.ts";
 import { CleanupTracker, CleanupTrackingMealItemMutationConfirmer } from "../helpers/cleanupTracker.ts";
 import { findMealItem } from "../helpers/dayPlanAssertions.ts";
+import { IntegrationTestContext } from "../helpers/IntegrationTestContext.ts";
 import { getIntegrationTestDate } from "../helpers/testDates.ts";
 
-const dayPlanClient = new DayPlanClient();
+const context = IntegrationTestContext.fromEnvironment();
+const dayPlanClient = context.dayPlanClient;
 const cleanup = new CleanupTracker(dayPlanClient);
 const mealItemMutationService = new MealItemMutationService(
 	dayPlanClient,
-	new FoodSearchClient(),
-	new RecipeClient(),
+	new FoodSearchService(context.foodSearchClient),
+	context.recipeClient,
 	new CleanupTrackingMealItemMutationConfirmer(new MealItemMutationConfirmer(dayPlanClient), cleanup),
 );
 const READ_AFTER_WRITE_ATTEMPTS = 60;
@@ -44,13 +44,12 @@ describe.sequential("Fitatu recipe meal-item integration", () => {
 			],
 		});
 
-		expect(addResult.status).toBe("accepted");
 		expect(addResult.operation).toBe("add");
-		expect(addResult.acceptedItems).toMatchObject([
+		expect(addResult.addedItems).toMatchObject([
 			{ foodType: "RECIPE", productId: null, recipeId: RECIPE_ID, mealKey: MEAL_KEY },
 		]);
 
-		const itemId = addResult.provisionalItemIds[0];
+		const itemId = addResult.addedItems[0]?.itemId;
 		expect(itemId).toBeTruthy();
 		cleanup.track(date, MEAL_KEY, itemId);
 
@@ -82,9 +81,8 @@ describe.sequential("Fitatu recipe meal-item integration", () => {
 				],
 			});
 
-			expect(addResult.status).toBe("accepted");
 			expect(addResult.operation).toBe("add");
-			expect(addResult.acceptedItems).toMatchObject([
+			expect(addResult.addedItems).toMatchObject([
 				{
 					foodType: "RECIPE",
 					productId: null,
@@ -93,7 +91,7 @@ describe.sequential("Fitatu recipe meal-item integration", () => {
 				},
 			]);
 
-			const itemId = requireItemId(addResult.provisionalItemIds[0]);
+			const itemId = requireItemId(addResult.addedItems[0]?.itemId);
 			cleanup.track(date, MEAL_KEY, itemId);
 
 			const item = await waitForItem(date, MEAL_KEY, itemId);
@@ -124,7 +122,7 @@ describe.sequential("Fitatu recipe meal-item integration", () => {
 				],
 			});
 
-			const itemId = requireItemId(addResult.provisionalItemIds[0]);
+			const itemId = requireItemId(addResult.addedItems[0]?.itemId);
 			cleanup.track(date, MEAL_KEY, itemId);
 
 			const item = await waitForItem(date, MEAL_KEY, itemId);

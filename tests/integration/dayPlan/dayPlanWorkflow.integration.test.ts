@@ -1,25 +1,30 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { DayPlanClient } from "../../../src/api/dayPlan/DayPlanClient.ts";
-import { FoodSearchClient } from "../../../src/api/foodSearch/FoodSearchClient.ts";
-import { RecipeClient } from "../../../src/api/recipes/RecipeClient.ts";
 import { MealItemMutationConfirmer } from "../../../src/services/dayPlan/MealItemMutationConfirmer.ts";
 import { MealItemMutationService } from "../../../src/services/dayPlan/MealItemMutationService.ts";
-import { ApplicationServices } from "../../../src/services/ApplicationServices.ts";
+import { DietSummaryService } from "../../../src/services/dietSummary/DietSummaryService.ts";
+import { FoodSearchService } from "../../../src/services/foodSearch/FoodSearchService.ts";
 import type { DayPlan } from "../../../src/api/dayPlan/DayPlan.ts";
 import type { DayPlanItem } from "../../../src/api/dayPlan/DayPlanItem.ts";
 import { CleanupTracker, CleanupTrackingMealItemMutationConfirmer } from "../helpers/cleanupTracker.ts";
 import { expectMealItem, expectNoMealItem } from "../helpers/dayPlanAssertions.ts";
-import { searchMultipleQueries, selectProductsByMeasure } from "../helpers/productSelection.ts";
+import { IntegrationTestContext } from "../helpers/IntegrationTestContext.ts";
+import {
+	searchMultipleQueries,
+	selectProductDifferentFrom,
+	selectProductsByMeasure,
+} from "../helpers/productSelection.ts";
 import { addDays, getIntegrationTestDate } from "../helpers/testDates.ts";
 
-const dayPlanClient = new DayPlanClient();
-const foodSearchClient = new FoodSearchClient();
+const context = IntegrationTestContext.fromEnvironment();
+const dayPlanClient = context.dayPlanClient;
+const foodSearchClient = context.foodSearchClient;
+const foodSearchService = new FoodSearchService(foodSearchClient);
 const cleanup = new CleanupTracker(dayPlanClient);
-const dietSummaryService = new ApplicationServices().dietSummaryService;
+const dietSummaryService = new DietSummaryService(context.summaryClient, context.userClient);
 const mealItemMutationService = new MealItemMutationService(
 	dayPlanClient,
-	foodSearchClient,
-	new RecipeClient(),
+	foodSearchService,
+	context.recipeClient,
 	new CleanupTrackingMealItemMutationConfirmer(new MealItemMutationConfirmer(dayPlanClient), cleanup),
 );
 
@@ -33,8 +38,8 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 		const nextDate = addDays(date, 1);
 		const initialPlan = await dayPlanClient.getDayPlan({ date, withRating: true });
 		const [sourceMealKey, targetMealKey] = selectTwoMealKeys(initialPlan);
-		await searchMultipleQueries({ foodSearchClient, date });
-		const products = await selectProductsByMeasure({ foodSearchClient, date });
+		await searchMultipleQueries({ foodSearchService: foodSearchService, date });
+		const products = await selectProductsByMeasure({ foodSearchService: foodSearchService, date });
 		const measureProduct = [products.fallbackProduct, products.gramProduct, products.packageProduct].find(
 			(product) => product.availableMeasures.some((measure) => measure.measureId !== product.measure.measureId),
 		);
@@ -77,18 +82,17 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 			],
 		});
 
-		expect(addResult.status).toBe("accepted");
 		expect(addResult.operation).toBe("add");
-		expect(addResult.operationCount).toBe(3);
-		expect(addResult.provisionalItemIds).toHaveLength(3);
-		for (const provisionalItemId of addResult.provisionalItemIds) {
-			cleanup.track(date, sourceMealKey, provisionalItemId);
+		expect(addResult.addedItems).toHaveLength(3);
+		for (const addedItem of addResult.addedItems) {
+			cleanup.track(date, sourceMealKey, addedItem.itemId);
 		}
 
+		const addedItemIds = addResult.addedItems.map(({ itemId }) => itemId);
 		const persistedItems = await getItems({
 			date,
 			mealKey: sourceMealKey,
-			itemIds: addResult.provisionalItemIds,
+			itemIds: addedItemIds,
 		});
 		const [quantityItem, measureItem, combinedItem] = persistedItems;
 		const quantityItemId = requireItemId(quantityItem?.itemId ?? null);
@@ -101,7 +105,7 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 			itemId: quantityItemId,
 			measureQuantity: 3,
 		});
-		expect(quantityUpdate.updatedItemIds).toEqual([quantityItemId]);
+		expect(quantityUpdate.updatedItem.itemId).toBe(quantityItemId);
 		expect(
 			(
 				await getItemMatching({
@@ -119,7 +123,7 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 			itemId: measureItemId,
 			measureId: alternateMeasure.measureId,
 		});
-		expect(measureUpdate.updatedItemIds).toEqual([measureItemId]);
+		expect(measureUpdate.updatedItem.itemId).toBe(measureItemId);
 		expect(
 			(
 				await getItemMatching({
@@ -138,7 +142,7 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 			measureQuantity: 1.5,
 			eaten: true,
 		});
-		expect(combinedUpdate.updatedItemIds).toEqual([combinedItemId]);
+		expect(combinedUpdate.updatedItem.itemId).toBe(combinedItemId);
 		const afterCombinedUpdate = await getItemMatching({
 			date,
 			mealKey: sourceMealKey,
@@ -147,7 +151,36 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 		});
 		expect(afterCombinedUpdate.measureQuantity).toBe(1.5);
 		expect(afterCombinedUpdate.eaten).toBe(true);
-
+		const replacementProduct = await selectProductDifferentFrom({
+			foodSearchService: foodSearchService,
+			date,
+			excludedProductId: products.packageProduct.productId,
+		});
+		const replaceResult = await mealItemMutationService.replaceMealItem({
+			date,
+			mealKey: sourceMealKey,
+			itemId: combinedItemId,
+			replacement: {
+				foodType: "PRODUCT",
+				productId: replacementProduct.productId,
+				measureId: replacementProduct.measure.measureId,
+				measureQuantity: 0.5,
+			},
+		});
+		expect(replaceResult).toMatchObject({
+			operation: "replace",
+			previousItemId: combinedItemId,
+		});
+		const replacementItemId = replaceResult.replacementItem.itemId;
+		await expectMissingItem({ date, mealKey: sourceMealKey, itemId: combinedItemId });
+		const replacementItem = await getItem({
+			date,
+			mealKey: sourceMealKey,
+			itemId: replacementItemId,
+		});
+		expect(String(replacementItem.productId)).toBe(replacementProduct.productId);
+		expect(replacementItem.measureQuantity).toBe(0.5);
+		expect(replacementItem.eaten).toBe(true);
 		const sameDayMove = await mealItemMutationService.moveMealItem({
 			fromDate: date,
 			fromMealKey: sourceMealKey,
@@ -155,22 +188,21 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 			toMealKey: targetMealKey,
 		});
 		expect(sameDayMove.operation).toBe("move");
-		expect(sameDayMove.oldItemId).toBe(quantityItemId);
-		expect(sameDayMove.newItemId).toBeTruthy();
-		expect(sameDayMove.itemIdChanged).toBe(true);
+		expect(sameDayMove.previousItemId).toBe(quantityItemId);
+		expect(sameDayMove.movedItem.itemId).toBeTruthy();
 		cleanup.move({
 			fromDate: date,
 			fromMealKey: sourceMealKey,
 			oldItemId: quantityItemId,
 			toDate: date,
 			toMealKey: targetMealKey,
-			newItemId: sameDayMove.newItemId,
+			newItemId: sameDayMove.movedItem.itemId,
 		});
 
 		const sameDayMovedItem = await getItem({
 			date,
 			mealKey: targetMealKey,
-			itemId: requireItemId(sameDayMove.newItemId),
+			itemId: sameDayMove.movedItem.itemId,
 		});
 		expect(sameDayMovedItem.measureQuantity).toBe(3);
 
@@ -182,38 +214,37 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 			toMealKey: targetMealKey,
 		});
 		expect(crossDayMove.operation).toBe("move");
-		expect(crossDayMove.oldItemId).toBe(measureItemId);
-		expect(crossDayMove.newItemId).toBeTruthy();
-		expect(crossDayMove.itemIdChanged).toBe(true);
+		expect(crossDayMove.previousItemId).toBe(measureItemId);
+		expect(crossDayMove.movedItem.itemId).toBeTruthy();
 		cleanup.move({
 			fromDate: date,
 			fromMealKey: sourceMealKey,
 			oldItemId: measureItemId,
 			toDate: nextDate,
 			toMealKey: targetMealKey,
-			newItemId: crossDayMove.newItemId,
+			newItemId: crossDayMove.movedItem.itemId,
 		});
 
 		const crossDayMovedItem = await getItem({
 			date: nextDate,
 			mealKey: targetMealKey,
-			itemId: requireItemId(crossDayMove.newItemId),
+			itemId: crossDayMove.movedItem.itemId,
 		});
 		expect(crossDayMovedItem.measureId).toBe(Number(alternateMeasure.measureId));
 
 		const removeResult = await mealItemMutationService.removeMealItem({
 			date,
 			mealKey: sourceMealKey,
-			itemId: combinedItemId,
+			itemId: replacementItemId,
 		});
 		expect(removeResult.operation).toBe("remove");
-		expect(removeResult.deletedItemIds).toEqual([combinedItemId]);
-		cleanup.untrack(date, sourceMealKey, combinedItemId);
+		expect(removeResult.removedItems.map(({ itemId }) => itemId)).toEqual([replacementItemId]);
+		cleanup.untrack(date, sourceMealKey, replacementItemId);
 
 		await expectMissingItem({
 			date,
 			mealKey: sourceMealKey,
-			itemId: combinedItemId,
+			itemId: replacementItemId,
 		});
 	});
 
@@ -241,16 +272,15 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 		});
 
 		expect(addResult).toMatchObject({
-			status: "accepted",
 			operation: "add",
-			acceptedItems: [
+			addedItems: [
 				{
 					foodType: "CUSTOM_ITEM",
 					mealKey,
 				},
 			],
 		});
-		const itemId = requireItemId(addResult.provisionalItemIds[0] ?? null);
+		const itemId = requireItemId(addResult.addedItems[0]?.itemId ?? null);
 		cleanup.track(date, mealKey, itemId);
 
 		const item = await getItemMatching({
@@ -298,8 +328,7 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 			Object.assign(expectedState, update.expected);
 			expect(updateResult).toMatchObject({
 				operation: "update",
-				updatedItemIds: [itemId],
-				itemIdChanged: false,
+				updatedItem: { itemId },
 			});
 			const updatedItem = await getItemMatching({
 				date,
@@ -318,7 +347,7 @@ describe.sequential("Fitatu day plan integration workflow", () => {
 			mealKey,
 			itemId,
 		});
-		expect(removeResult.deletedItemIds).toEqual([itemId]);
+		expect(removeResult.removedItems.map(({ itemId: removedItemId }) => removedItemId)).toEqual([itemId]);
 		cleanup.untrack(date, mealKey, itemId);
 		await expectMissingItem({ date, mealKey, itemId });
 	});

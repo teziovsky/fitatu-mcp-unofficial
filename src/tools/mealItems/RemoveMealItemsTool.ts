@@ -6,10 +6,11 @@ import { createTextResult } from "../shared/ToolResult.ts";
 import type { MealItemMutationProvider } from "../../services/dayPlan/MealItemMutationService.ts";
 import {
 	createSafeMealItemErrorResult,
-	mealItemMutationOutputSchema,
-	toMealItemMutationForMcp,
+	MEAL_ITEM_MUTATION_SERIALIZATION_HINT,
+	removeMealItemsOutputSchema,
+	toRemoveMealItemsForMcp,
 } from "./MealItemToolSupport.ts";
-import { isoCalendarDateSchema } from "../shared/ToolSchemas.ts";
+import { isoCalendarDateSchema, nonEmptyStringSchema } from "../shared/ToolSchemas.ts";
 
 export class RemoveMealItemsTool {
 	public static readonly toolName = "remove_meal_items";
@@ -25,8 +26,7 @@ export class RemoveMealItemsTool {
 			RemoveMealItemsTool.toolName,
 			{
 				title: "Remove Fitatu Meal Items",
-				description:
-					"Atomically removes and confirms exact Fitatu day-plan entries of any food type. Copy each mealKey and itemId pair from get_day_plan_items; do not pass productId or recipeId. If any requested active item is missing from its declared meal context, nothing is synchronized. A successful accepted result means every selected item is absent from the persisted active day plan.",
+				description: `Atomically removes and confirms exact Fitatu day-plan entries of any food type. Copy each mealKey and itemId pair from get_day_plan_items; do not pass productId or recipeId. If any requested active item is missing from its declared meal context, nothing is synchronized. ${MEAL_ITEM_MUTATION_SERIALIZATION_HINT} Returns { status: 'confirmed', date, removedItems: [{ inputIndex, mealKey, itemId }] } after every selected item is absent from the persisted active day plan.`,
 				inputSchema: z
 					.object({
 						date: isoCalendarDateSchema().describe("Day containing the exact meal items to remove."),
@@ -35,7 +35,7 @@ export class RemoveMealItemsTool {
 								z
 									.object({
 										mealKey: z.string().trim().min(1),
-										itemId: z.string().uuid(),
+										itemId: nonEmptyStringSchema("itemId"),
 									})
 									.strict(),
 							)
@@ -53,7 +53,7 @@ export class RemoveMealItemsTool {
 							),
 					})
 					.strict(),
-				outputSchema: mealItemMutationOutputSchema,
+				outputSchema: removeMealItemsOutputSchema,
 				annotations: {
 					title: "Remove Fitatu Meal Items",
 					readOnlyHint: false,
@@ -70,7 +70,7 @@ export class RemoveMealItemsTool {
 							items.map((item) => new MealItemRemovalTarget(item.mealKey, item.itemId)),
 						),
 					);
-					return createTextResult(toMealItemMutationForMcp(result));
+					return createTextResult(toRemoveMealItemsForMcp(result));
 				} catch (error) {
 					return createSafeMealItemErrorResult(
 						RemoveMealItemsTool.toolName,
