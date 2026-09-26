@@ -42,16 +42,16 @@ Set `FITATU_EMAIL` and `FITATU_PASSWORD` in `.env`, then start the development s
 npm run dev
 ```
 
-The default MCP endpoint is `http://localhost:3000/mcp`.
+The default MCP endpoint is `http://localhost:8000/mcp`.
 
 ## MCP client configuration
 
 Choose one transport with `MCP_TRANSPORT`:
 
-| Transport | Best for | Process model |
-| --- | --- | --- |
-| `stdio` | A local client that launches its own MCP server | One server process per client |
-| `http` | A persistent server shared by one or more clients | Long-running server on `/mcp` |
+| Transport | Best for                                          | Process model                 |
+| --------- | ------------------------------------------------- | ----------------------------- |
+| `stdio`   | A local client that launches its own MCP server   | One server process per client |
+| `http`    | A persistent server shared by one or more clients | Long-running server on `/mcp` |
 
 ### stdio
 
@@ -116,7 +116,7 @@ To inspect the local server interactively:
 npm run inspector
 ```
 
-Connect the Inspector to `http://localhost:3000/mcp`.
+Connect the Inspector to `http://localhost:8000/mcp`.
 
 #### Remote MCP access with ngrok
 
@@ -139,48 +139,48 @@ In any MCP client that supports remote Streamable HTTP connections, use one of t
 
 ## Available tools
 
-| Tool | Purpose |
-| --- | --- |
-| `get_current_user` | Return a safe subset of the authenticated user profile. |
-| `get_body_measurement` | Return the latest body measurement, or the complete entry for an optional `YYYY-MM-DD` date. |
-| `save_body_measurement` | Partially update body measurements for a `YYYY-MM-DD` date using profile units. |
-| `get_user_settings` | Return date-resolved energy, calculated, and water settings with requested and effective dates; date defaults to today in the Fitatu timezone. |
-| `update_user_settings` | Set a manual or automatic energy target, update the water serving size, or apply both changes together. |
-| `get_day_plan_items` | Return meals and food items for a `YYYY-MM-DD` date. |
-| `get_diet_summary` | Summarize nutrition and energy for an inclusive date range. |
-| `search_food` | Search Fitatu food catalogs and return mutation-ready identifiers. |
-| `search_food_by_barcodes` | Search the public food catalog for up to 10 barcodes in parallel. |
-| `add_meal_items` | Add products, recipes, or custom items to a meal. |
-| `update_meal_item` | Update quantity, measure, or eaten state. |
-| `replace_meal_item` | Replace one exact meal entry. |
-| `move_meal_item` | Move an item to another meal, date, or both. |
-| `remove_meal_items` | Atomically remove selected day-plan entries by UUID. |
-| `search_recipes` | Search private recipes, public recipes, or both catalogs. |
-| `get_recipe` | Return canonical per-serving recipe details. |
-| `create_recipe` | Create a private recipe from product and measure identifiers. |
-| `update_recipe` | Partially update an owned, editable recipe. |
-| `delete_recipe` | Soft-delete a recipe after exact-name confirmation. |
+| Tool                      | Purpose                                                                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_current_user`        | Return a safe subset of the authenticated user profile.                                                                                        |
+| `get_body_measurement`    | Return the latest body measurement, or the complete entry for an optional `YYYY-MM-DD` date.                                                   |
+| `save_body_measurement`   | Partially update body measurements for a `YYYY-MM-DD` date using profile units.                                                                |
+| `get_user_settings`       | Return date-resolved energy, calculated, and water settings with requested and effective dates; date defaults to today in the Fitatu timezone. |
+| `update_user_settings`    | Set a manual or automatic energy target, update the water serving size, or apply both changes together.                                        |
+| `get_day_plan_items`      | Return meals and food items for a `YYYY-MM-DD` date.                                                                                           |
+| `get_diet_summary`        | Summarize nutrition and energy for an inclusive date range.                                                                                    |
+| `search_food`             | Search Fitatu food catalogs and return mutation-ready identifiers.                                                                             |
+| `search_food_by_barcodes` | Search the public food catalog for up to 10 barcodes in parallel.                                                                              |
+| `add_meal_items`          | Add products, recipes, or custom items to a meal.                                                                                              |
+| `update_meal_item`        | Update quantity, measure, or eaten state.                                                                                                      |
+| `replace_meal_item`       | Replace one exact meal entry.                                                                                                                  |
+| `move_meal_item`          | Move an item to another meal, date, or both.                                                                                                   |
+| `remove_meal_items`       | Atomically remove selected day-plan entries by UUID.                                                                                           |
+| `search_recipes`          | Search private recipes, public recipes, or both catalogs.                                                                                      |
+| `get_recipe`              | Return canonical per-serving recipe details.                                                                                                   |
+| `create_recipe`           | Create a private recipe from product and measure identifiers.                                                                                  |
+| `update_recipe`           | Partially update an owned, editable recipe.                                                                                                    |
+| `delete_recipe`           | Soft-delete a recipe after exact-name confirmation.                                                                                            |
 
 ## Configuration
 
 Runtime configuration is read from environment variables and validated at startup.
 
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `FITATU_EMAIL` | Yes | — | Fitatu account email address. |
-| `FITATU_PASSWORD` | Yes | — | Fitatu account password. |
-| `FITATU_INTEGRATION_EMAIL` | For integration tests and tunnel commands | — | Email address of a dedicated Fitatu test account. |
-| `FITATU_INTEGRATION_PASSWORD` | For integration tests and tunnel commands | — | Password for the dedicated Fitatu test account. |
-| `MCP_TRANSPORT` | No | `http` | MCP transport: `http` or `stdio`. |
-| `PORT` | No | `3000` | HTTP port; unused in stdio mode. |
-| `HOST` | No | `0.0.0.0` | HTTP bind address; unused in stdio mode. The tunnel launcher forces loopback. |
-| `NODE_ENV` | No | `development` | `development`, `production`, or `test`. |
-| `SERVER_NAME` | No | `fitatu-mcp` | Name reported by the MCP server. |
-| `SERVER_VERSION` | No | `3.0.0` | Version reported by the MCP server. |
-| `LOG_LEVEL` | No | `info` | `silent`, `error`, `warn`, `info`, or `debug`. |
-| `FITATU_USER_AGENT` | No | `Dart/3.10 (dart:io)` | Fitatu mobile runtime user agent. |
-| `FITATU_APP_VERSION` | No | `4.14.4` | Fitatu mobile application version. |
-| `FITATU_API_APK_UUID` | No | `BE4B.251210.005` | Fitatu mobile build identifier. |
+| Variable                      | Required                                  | Default               | Description                                                                   |
+| ----------------------------- | ----------------------------------------- | --------------------- | ----------------------------------------------------------------------------- |
+| `FITATU_EMAIL`                | Yes                                       | —                     | Fitatu account email address.                                                 |
+| `FITATU_PASSWORD`             | Yes                                       | —                     | Fitatu account password.                                                      |
+| `FITATU_INTEGRATION_EMAIL`    | For integration tests and tunnel commands | —                     | Email address of a dedicated Fitatu test account.                             |
+| `FITATU_INTEGRATION_PASSWORD` | For integration tests and tunnel commands | —                     | Password for the dedicated Fitatu test account.                               |
+| `MCP_TRANSPORT`               | No                                        | `http`                | MCP transport: `http` or `stdio`.                                             |
+| `PORT`                        | No                                        | `8000`                | HTTP port; unused in stdio mode.                                              |
+| `HOST`                        | No                                        | `0.0.0.0`             | HTTP bind address; unused in stdio mode. The tunnel launcher forces loopback. |
+| `NODE_ENV`                    | No                                        | `development`         | `development`, `production`, or `test`.                                       |
+| `SERVER_NAME`                 | No                                        | `fitatu-mcp`          | Name reported by the MCP server.                                              |
+| `SERVER_VERSION`              | No                                        | `3.0.0`               | Version reported by the MCP server.                                           |
+| `LOG_LEVEL`                   | No                                        | `info`                | `silent`, `error`, `warn`, `info`, or `debug`.                                |
+| `FITATU_USER_AGENT`           | No                                        | `Dart/3.10 (dart:io)` | Fitatu mobile runtime user agent.                                             |
+| `FITATU_APP_VERSION`          | No                                        | `4.14.4`              | Fitatu mobile application version.                                            |
+| `FITATU_API_APK_UUID`         | No                                        | `BE4B.251210.005`     | Fitatu mobile build identifier.                                               |
 
 Do not commit `.env`. The mobile client profile defaults match Fitatu 4.14.4 traffic captured on 2026-07-30 and can be overridden without changing code.
 
@@ -191,26 +191,26 @@ The current image build requires a configured `.env` file:
 ```bash
 cp .env.example .env
 docker build -t fitatu-mcp .
-docker run --name fitatu-mcp -p 3000:3000 fitatu-mcp
+docker run --name fitatu-mcp -p 8000:8000 fitatu-mcp
 ```
 
 The Dockerfile copies `.env` into the image. Treat the resulting image as sensitive; do not publish or share it.
 
 ## Development
 
-| Task | Command |
-| --- | --- |
-| Development server | `npm run dev` |
-| Both accounts with ngrok | `npm run dev:all` |
-| Test account with ngrok | `npm run dev:test-account` |
-| Production build | `npm run build` |
-| Start built server | `npm start` |
-| Type checking | `npm run typecheck` |
-| Lint | `npm run lint` |
-| Formatting check | `npm run format:check` |
-| Unit tests with coverage | `npm run test:ci` |
-| Local coverage report | `npm run test:coverage` |
-| Integration tests | `npm run test:integration` |
+| Task                     | Command                    |
+| ------------------------ | -------------------------- |
+| Development server       | `npm run dev`              |
+| Both accounts with ngrok | `npm run dev:all`          |
+| Test account with ngrok  | `npm run dev:test-account` |
+| Production build         | `npm run build`            |
+| Start built server       | `npm start`                |
+| Type checking            | `npm run typecheck`        |
+| Lint                     | `npm run lint`             |
+| Formatting check         | `npm run format:check`     |
+| Unit tests with coverage | `npm run test:ci`          |
+| Local coverage report    | `npm run test:coverage`    |
+| Integration tests        | `npm run test:integration` |
 
 `npm run test:ci` is deterministic and does not load Fitatu credentials. Integration tests use the dedicated Fitatu test account described above and may
 mutate its meal-plan, recipe, and body-measurement data.
