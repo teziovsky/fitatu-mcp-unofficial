@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { AddMealItemsOptions } from "../../../../src/api/dayPlan/AddMealItemsOptions.ts";
+import { AddMealItemsResult } from "../../../../src/api/dayPlan/AddMealItemsResult.ts";
 import { DayPlan } from "../../../../src/api/dayPlan/DayPlan.ts";
 import { DayRevisions } from "../../../../src/api/dayPlan/DayRevisions.ts";
-import { MealItemMutationResult } from "../../../../src/api/dayPlan/MealItemMutationResult.ts";
 import { MealItemOperationSummary } from "../../../../src/api/dayPlan/MealItemOperationSummary.ts";
+import { MoveMealItemResult } from "../../../../src/api/dayPlan/MoveMealItemResult.ts";
 import { MoveMealItemOptions } from "../../../../src/api/dayPlan/MoveMealItemOptions.ts";
 import { RemoveMealItemsOptions } from "../../../../src/api/dayPlan/RemoveMealItemsOptions.ts";
 import { MealItemRemovalTarget } from "../../../../src/api/dayPlan/MealItemRemovalTarget.ts";
@@ -15,6 +16,9 @@ import { MealItemMutationConfirmer } from "../../../../src/services/dayPlan/Meal
 import { SERVICE_ERROR_CODES } from "../../../../src/services/ServiceErrorCode.ts";
 import { AddMealItemsTool } from "../../../../src/tools/addMealItems/AddMealItemsTool.ts";
 import { GetDayPlanItemsTool } from "../../../../src/tools/dayPlanItems/GetDayPlanItemsTool.ts";
+import { ProductMealItemInput } from "../../../../src/api/dayPlan/ProductMealItemInput.ts";
+import { ReplaceMealItemOptions } from "../../../../src/api/dayPlan/ReplaceMealItemOptions.ts";
+import { ReplaceMealItemResult } from "../../../../src/api/dayPlan/ReplaceMealItemResult.ts";
 
 describe("MealItemMutationConfirmer", () => {
 	it("confirms a batch only after every submitted item is visible by its exact itemId and values", async () => {
@@ -76,7 +80,7 @@ describe("MealItemMutationConfirmer", () => {
 				eaten: false,
 			},
 		]);
-		const result = MealItemMutationResult.acceptedAdd(
+		const result = new AddMealItemsResult(
 			"2026-07-30",
 			"breakfast",
 			[
@@ -192,7 +196,7 @@ describe("MealItemMutationConfirmer", () => {
 				eaten: true,
 			},
 		]);
-		const result = MealItemMutationResult.acceptedAdd(
+		const result = new AddMealItemsResult(
 			"2026-07-30",
 			"supper",
 			[
@@ -226,6 +230,54 @@ describe("MealItemMutationConfirmer", () => {
 			]),
 		);
 
+		expect(reads).toBe(2);
+	});
+
+	it("confirms replacement when the old item is absent and the new item matches regardless of order", async () => {
+		const plans = [
+			dayPlan({
+				dinner: [
+					{ planDayDietItemId: "before", foodType: "PRODUCT", productId: 100, measureId: 1 },
+					{ planDayDietItemId: "old-item", foodType: "PRODUCT", productId: 101, measureId: 1 },
+					{ planDayDietItemId: "after", foodType: "PRODUCT", productId: 102, measureId: 1 },
+				],
+			}),
+			dayPlan({
+				dinner: [
+					{
+						planDayDietItemId: "new-item",
+						foodType: "PRODUCT",
+						productId: 202,
+						measureId: 2,
+						measureQuantity: 0.5,
+						eaten: true,
+					},
+					{ planDayDietItemId: "before", foodType: "PRODUCT", productId: 100, measureId: 1 },
+					{ planDayDietItemId: "after", foodType: "PRODUCT", productId: 102, measureId: 1 },
+				],
+			}),
+		];
+		let reads = 0;
+		const confirmer = new MealItemMutationConfirmer(
+			{ getDayPlan: async () => plans[Math.min(reads++, plans.length - 1)]! },
+			new BoundedPoller({ intervalMs: 1, timeoutMs: 50 }),
+		);
+		const options = new ReplaceMealItemOptions(
+			"2026-07-30",
+			"dinner",
+			"old-item",
+			new ProductMealItemInput("202", "2", 0.5),
+		);
+		const result = new ReplaceMealItemResult(
+			"2026-07-30",
+			"dinner",
+			"old-item",
+			new MealItemOperationSummary(0, "new-item", "202", null, "PRODUCT", "dinner"),
+			DayRevisions.empty(),
+			true,
+		);
+
+		await expect(confirmer.confirmReplaced(options, result)).resolves.toBeUndefined();
 		expect(reads).toBe(2);
 	});
 
@@ -273,10 +325,11 @@ describe("MealItemMutationConfirmer", () => {
 		const options = new MoveMealItemOptions("2026-07-30", "breakfast", "old-item", "2026-07-31", "lunch");
 		const source = await confirmer.getMoveSource(options);
 		mutationSubmitted = true;
-		const result = MealItemMutationResult.acceptedMove(
+		const result = new MoveMealItemResult(
 			"2026-07-30",
 			"breakfast",
 			"old-item",
+			"2026-07-31",
 			new MealItemOperationSummary(0, "new-item", 101, null, "PRODUCT", "lunch"),
 			DayRevisions.empty(),
 		);
@@ -319,10 +372,11 @@ describe("MealItemMutationConfirmer", () => {
 		const options = new MoveMealItemOptions("2026-07-30", "breakfast", "old-item", undefined, "lunch");
 		const source = await confirmer.getMoveSource(options);
 		mutationSubmitted = true;
-		const result = MealItemMutationResult.acceptedMove(
+		const result = new MoveMealItemResult(
 			"2026-07-30",
 			"breakfast",
 			"old-item",
+			"2026-07-30",
 			new MealItemOperationSummary(0, "new-item", "101", null, "PRODUCT", "lunch"),
 			DayRevisions.empty(),
 		);
@@ -338,7 +392,7 @@ describe("MealItemMutationConfirmer", () => {
 		const options = new AddMealItemsOptions("2026-07-30", "breakfast", [
 			{ foodType: "PRODUCT", productId: "101", measureId: "2" },
 		]);
-		const result = MealItemMutationResult.acceptedAdd(
+		const result = new AddMealItemsResult(
 			"2026-07-30",
 			"breakfast",
 			[new MealItemOperationSummary(0, "item-1", "101", null, "PRODUCT", "breakfast")],
@@ -391,7 +445,7 @@ describe("MealItemMutationConfirmer", () => {
 		const options = new AddMealItemsOptions("2026-07-30", "breakfast", [
 			{ foodType: "PRODUCT", productId: "101", measureId: "2" },
 		]);
-		const result = MealItemMutationResult.acceptedAdd(
+		const result = new AddMealItemsResult(
 			"2026-07-30",
 			"breakfast",
 			[new MealItemOperationSummary(0, "item-1", "101", null, "PRODUCT", "breakfast")],
@@ -421,7 +475,7 @@ describe("MealItemMutationConfirmer", () => {
 		const options = new AddMealItemsOptions("2026-07-30", "breakfast", [
 			{ foodType: "PRODUCT", productId: "101", measureId: "2" },
 		]);
-		const result = MealItemMutationResult.acceptedAdd(
+		const result = new AddMealItemsResult(
 			"2026-07-30",
 			"breakfast",
 			[new MealItemOperationSummary(0, "item-1", "101", null, "PRODUCT", "breakfast")],

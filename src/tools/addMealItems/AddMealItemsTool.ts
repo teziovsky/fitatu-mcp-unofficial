@@ -4,13 +4,14 @@ import { AddMealItemsOptions } from "../../api/dayPlan/AddMealItemsOptions.ts";
 import { createTextResult } from "../shared/ToolResult.ts";
 import type { MealItemMutationProvider } from "../../services/dayPlan/MealItemMutationService.ts";
 import {
+	addMealItemsOutputSchema,
 	createSafeMealItemErrorResult,
+	MEAL_ITEM_MUTATION_SERIALIZATION_HINT,
 	MEAL_KEY_HINT,
 	mealKeySchema,
 	mealItemInputSchema,
-	mealItemMutationOutputSchema,
+	toAddMealItemsForMcp,
 	toMealItemInput,
-	toMealItemMutationForMcp,
 } from "../mealItems/MealItemToolSupport.ts";
 import { isoCalendarDateSchema } from "../shared/ToolSchemas.ts";
 
@@ -28,8 +29,7 @@ export class AddMealItemsTool {
 			AddMealItemsTool.toolName,
 			{
 				title: "Add Fitatu Meal Items",
-				description:
-					"Validates, submits, and confirms products, recipes, or fallback one-off custom items in a Fitatu meal. Prefer a catalog product or recipe: search with search_food or search_recipes first, then provide productId and measureId for a product or raw recipeId and measureId for a recipe. Custom items are not preferred; use name and nutrition values only when no suitable catalog match exists. The id field selects the variant. Deleted recipes and mismatched measures are rejected before synchronization. A successful accepted result means every submitted item was observed in the persisted day plan by its exact itemId.",
+				description: `Validates, submits, and confirms products, recipes, or fallback one-off custom items in a Fitatu meal. Prefer a catalog product or recipe: search with search_food or search_recipes first, then provide productId and measureId for a product or raw recipeId and measureId for a recipe. Custom items are not preferred; use name and nutrition values only when no suitable catalog match exists. The id field selects the variant. Deleted recipes and mismatched measures are rejected before synchronization. Put multiple items for the same meal in one items array; add items for different meals with sequential tool calls. ${MEAL_ITEM_MUTATION_SERIALIZATION_HINT} Returns { status: 'confirmed', date, mealKey, addedItems: [{ inputIndex, itemId }] }; each itemId is persisted and ready for later meal-item mutations.`,
 				inputSchema: z
 					.object({
 						date: isoCalendarDateSchema().describe(
@@ -46,7 +46,7 @@ export class AddMealItemsTool {
 							),
 					})
 					.strict(),
-				outputSchema: mealItemMutationOutputSchema,
+				outputSchema: addMealItemsOutputSchema,
 				annotations: {
 					title: "Add Fitatu Meal Items",
 					readOnlyHint: false,
@@ -60,7 +60,7 @@ export class AddMealItemsTool {
 					const result = await this.mealItemMutationService.addMealItems(
 						new AddMealItemsOptions(date, mealKey, items.map(toMealItemInput)),
 					);
-					return createTextResult(toMealItemMutationForMcp(result));
+					return createTextResult(toAddMealItemsForMcp(result));
 				} catch (error) {
 					return createSafeMealItemErrorResult(
 						AddMealItemsTool.toolName,

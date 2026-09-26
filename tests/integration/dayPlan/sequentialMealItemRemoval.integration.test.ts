@@ -1,21 +1,22 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { DayPlanClient } from "../../../src/api/dayPlan/DayPlanClient.ts";
-import { FoodSearchClient } from "../../../src/api/foodSearch/FoodSearchClient.ts";
-import { RecipeClient } from "../../../src/api/recipes/RecipeClient.ts";
 import { MealItemMutationConfirmer } from "../../../src/services/dayPlan/MealItemMutationConfirmer.ts";
 import { MealItemMutationService } from "../../../src/services/dayPlan/MealItemMutationService.ts";
+import { FoodSearchService } from "../../../src/services/foodSearch/FoodSearchService.ts";
 import { CleanupTracker, CleanupTrackingMealItemMutationConfirmer } from "../helpers/cleanupTracker.ts";
 import { expectMealItem, expectNoMealItem } from "../helpers/dayPlanAssertions.ts";
+import { IntegrationTestContext } from "../helpers/IntegrationTestContext.ts";
 import { selectProductsByMeasure } from "../helpers/productSelection.ts";
 import { addDays, getIntegrationTestDate } from "../helpers/testDates.ts";
 
-const dayPlanClient = new DayPlanClient();
-const foodSearchClient = new FoodSearchClient();
+const context = IntegrationTestContext.fromEnvironment();
+const dayPlanClient = context.dayPlanClient;
+const foodSearchClient = context.foodSearchClient;
+const foodSearchService = new FoodSearchService(foodSearchClient);
 const cleanup = new CleanupTracker(dayPlanClient);
 const mealItemMutationService = new MealItemMutationService(
 	dayPlanClient,
-	foodSearchClient,
-	new RecipeClient(),
+	foodSearchService,
+	context.recipeClient,
 	new CleanupTrackingMealItemMutationConfirmer(new MealItemMutationConfirmer(dayPlanClient), cleanup),
 );
 const MEAL_KEY = "breakfast";
@@ -28,7 +29,7 @@ describe.sequential("Fitatu sequential meal-item removal integration", () => {
 
 	it("removes batch-added breakfast products in one accepted day sync", async () => {
 		const date = getIntegrationTestDate();
-		const products = await selectProductsByMeasure({ foodSearchClient, date });
+		const products = await selectProductsByMeasure({ foodSearchService: foodSearchService, date });
 		const items = [products.fallbackProduct, products.gramProduct, products.packageProduct].map((product) => ({
 			productId: product.productId,
 			foodType: "PRODUCT" as const,
@@ -43,12 +44,10 @@ describe.sequential("Fitatu sequential meal-item removal integration", () => {
 			items,
 		});
 
-		expect(addResult.status).toBe("accepted");
 		expect(addResult.operation).toBe("add");
-		expect(addResult.operationCount).toBe(items.length);
-		expect(addResult.provisionalItemIds).toHaveLength(items.length);
+		expect(addResult.addedItems).toHaveLength(items.length);
 
-		const persistedItemIds = addResult.provisionalItemIds;
+		const persistedItemIds = addResult.addedItems.map(({ itemId }) => itemId);
 		const afterAdd = await dayPlanClient.getDayPlan({ date });
 		for (const itemId of persistedItemIds) {
 			expectMealItem(afterAdd, MEAL_KEY, itemId);
@@ -62,10 +61,8 @@ describe.sequential("Fitatu sequential meal-item removal integration", () => {
 			items: persistedItemIds.map((itemId) => ({ mealKey: MEAL_KEY, itemId })),
 		});
 
-		expect(removeResult.status).toBe("accepted");
 		expect(removeResult.operation).toBe("remove");
-		expect(removeResult.operationCount).toBe(items.length);
-		expect(removeResult.deletedItemIds).toEqual(persistedItemIds);
+		expect(removeResult.removedItems.map(({ itemId }) => itemId)).toEqual(persistedItemIds);
 		const afterRemoval = await dayPlanClient.getDayPlan({ date });
 		for (const itemId of persistedItemIds) {
 			expectNoMealItem(afterRemoval, MEAL_KEY, itemId);
@@ -75,7 +72,7 @@ describe.sequential("Fitatu sequential meal-item removal integration", () => {
 
 	it("removes a catalog item before adding its custom replacement", async () => {
 		const date = addDays(getIntegrationTestDate(), 3);
-		const products = await selectProductsByMeasure({ foodSearchClient, date });
+		const products = await selectProductsByMeasure({ foodSearchService: foodSearchService, date });
 		await cleanup.prepareMealAddition(date, REPLACEMENT_MEAL_KEY, 1);
 		const addCatalogResult = await mealItemMutationService.addMealItems({
 			date,
@@ -90,7 +87,7 @@ describe.sequential("Fitatu sequential meal-item removal integration", () => {
 				},
 			],
 		});
-		const provisionalCatalogItemId = requireItemId(addCatalogResult.provisionalItemIds[0] ?? null);
+		const provisionalCatalogItemId = requireItemId(addCatalogResult.addedItems[0]?.itemId ?? null);
 		cleanup.track(date, REPLACEMENT_MEAL_KEY, provisionalCatalogItemId);
 
 		const catalogItemId = provisionalCatalogItemId;
@@ -101,9 +98,8 @@ describe.sequential("Fitatu sequential meal-item removal integration", () => {
 			items: [{ mealKey: REPLACEMENT_MEAL_KEY, itemId: catalogItemId }],
 		});
 		expect(removeResult).toMatchObject({
-			status: "accepted",
 			operation: "remove",
-			deletedItemIds: [catalogItemId],
+			removedItems: [{ itemId: catalogItemId }],
 		});
 
 		const replacementName = `Fitatu MCP custom replacement ${Date.now()}`;
@@ -123,7 +119,7 @@ describe.sequential("Fitatu sequential meal-item removal integration", () => {
 				},
 			],
 		});
-		const customItemId = requireItemId(addCustomResult.provisionalItemIds[0] ?? null);
+		const customItemId = requireItemId(addCustomResult.addedItems[0]?.itemId ?? null);
 		cleanup.track(date, REPLACEMENT_MEAL_KEY, customItemId);
 
 		const finalItems =

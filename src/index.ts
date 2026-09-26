@@ -9,14 +9,20 @@ import { GetDayPlanItemsTool } from "./tools/dayPlanItems/GetDayPlanItemsTool.ts
 import { GetDietSummaryTool } from "./tools/dietSummary/GetDietSummaryTool.ts";
 import { MoveMealItemTool } from "./tools/mealItems/MoveMealItemTool.ts";
 import { RemoveMealItemsTool } from "./tools/mealItems/RemoveMealItemsTool.ts";
+import { ReplaceMealItemTool } from "./tools/mealItems/ReplaceMealItemTool.ts";
 import { UpdateMealItemTool } from "./tools/mealItems/UpdateMealItemTool.ts";
 import { SearchFoodTool } from "./tools/searchFood/SearchFoodTool.ts";
+import { SearchFoodByBarcodesTool } from "./tools/searchFood/SearchFoodByBarcodesTool.ts";
 import { CreateRecipeTool } from "./tools/recipes/CreateRecipeTool.ts";
 import { DeleteRecipeTool } from "./tools/recipes/DeleteRecipeTool.ts";
 import { GetRecipeTool } from "./tools/recipes/GetRecipeTool.ts";
 import { SearchRecipesTool } from "./tools/recipes/SearchRecipesTool.ts";
 import { UpdateRecipeTool } from "./tools/recipes/UpdateRecipeTool.ts";
 import { ApplicationServices } from "./services/ApplicationServices.ts";
+import { GetUserSettingsTool } from "./tools/userSettings/GetUserSettingsTool.ts";
+import { UpdateUserSettingsTool } from "./tools/userSettings/UpdateUserSettingsTool.ts";
+import { GetBodyMeasurementTool } from "./tools/bodyMeasurements/GetBodyMeasurementTool.ts";
+import { SaveBodyMeasurementTool } from "./tools/bodyMeasurements/SaveBodyMeasurementTool.ts";
 
 const applicationServices = new ApplicationServices();
 
@@ -28,11 +34,17 @@ const getServer = (): McpServer => {
 	});
 
 	new GetCurrentUserTool(applicationServices.currentUserService).register(server);
+	new GetBodyMeasurementTool(applicationServices.bodyMeasurementService).register(server);
+	new SaveBodyMeasurementTool(applicationServices.bodyMeasurementService).register(server);
+	new GetUserSettingsTool(applicationServices.userSettingsService).register(server);
+	new UpdateUserSettingsTool(applicationServices.userSettingsService).register(server);
 	new GetDayPlanItemsTool(applicationServices.dayPlanQueryService).register(server);
 	new GetDietSummaryTool(applicationServices.dietSummaryService).register(server);
 	new SearchFoodTool(applicationServices.foodSearchService).register(server);
+	new SearchFoodByBarcodesTool(applicationServices.foodSearchService).register(server);
 	new AddMealItemsTool(applicationServices.mealItemMutationService).register(server);
 	new UpdateMealItemTool(applicationServices.mealItemMutationService).register(server);
+	new ReplaceMealItemTool(applicationServices.mealItemMutationService).register(server);
 	new RemoveMealItemsTool(applicationServices.mealItemMutationService).register(server);
 	new MoveMealItemTool(applicationServices.mealItemMutationService).register(server);
 	new CreateRecipeTool(applicationServices.recipeService).register(server);
@@ -74,7 +86,7 @@ async function startStdio(): Promise<void> {
 async function startHttp(): Promise<void> {
 	const config = getConfig();
 	const httpServer = new McpHttpServer({ createServer: getServer, logger });
-	const listener = httpServer.app.listen(config.PORT, () => {
+	const listener = httpServer.app.listen(config.PORT, config.HOST, () => {
 		logger.info(
 			{
 				environment: config.NODE_ENV,

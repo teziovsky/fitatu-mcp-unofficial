@@ -9,9 +9,10 @@ import { FitatuMobileClientProfile } from "./api/fitatuApiClientBase/FitatuMobil
 const configSchema = z.object({
 	MCP_TRANSPORT: z.enum(["http", "stdio"]).default("http"),
 	PORT: z.coerce.number().default(3000),
+	HOST: z.string().min(1).default("0.0.0.0"),
 	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 	SERVER_NAME: z.string().default("fitatu-mcp"),
-	SERVER_VERSION: z.string().default("2.0.0"),
+	SERVER_VERSION: z.string().default("3.0.1"),
 	LOG_LEVEL: z.enum(["silent", "error", "warn", "info", "debug"]).default("info"),
 	FITATU_EMAIL: z.string().email("FITATU_EMAIL must be a valid email address"),
 	FITATU_PASSWORD: z.string().min(1, "FITATU_PASSWORD is required"),
@@ -25,6 +26,12 @@ const loggerConfigSchema = configSchema.pick({
 	SERVER_NAME: true,
 	SERVER_VERSION: true,
 	LOG_LEVEL: true,
+});
+
+const mobileClientProfileConfigSchema = configSchema.pick({
+	FITATU_USER_AGENT: true,
+	FITATU_APP_VERSION: true,
+	FITATU_API_APK_UUID: true,
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -46,8 +53,8 @@ export function getFitatuPassword(): string {
 	return getConfig().FITATU_PASSWORD;
 }
 
-export function getFitatuMobileClientProfile(): FitatuMobileClientProfile {
-	const config = getConfig();
+export function getFitatuMobileClientProfile(environment: NodeJS.ProcessEnv = process.env): FitatuMobileClientProfile {
+	const config = parseEnvironment(mobileClientProfileConfigSchema, environment);
 	return new FitatuMobileClientProfile(
 		config.FITATU_USER_AGENT,
 		config.FITATU_APP_VERSION,
@@ -63,9 +70,9 @@ export function isDevelopment(): boolean {
 	return getConfig().NODE_ENV === "development";
 }
 
-function parseEnvironment<Output>(schema: z.ZodType<Output>): Output {
+function parseEnvironment<Output>(schema: z.ZodType<Output>, environment: NodeJS.ProcessEnv = process.env): Output {
 	try {
-		return schema.parse(process.env);
+		return schema.parse(environment);
 	} catch (error) {
 		console.error("❌ Invalid environment configuration:", error);
 		process.exit(1);
